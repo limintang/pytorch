@@ -398,6 +398,8 @@ void batched_apply_pivots_parallel(
     .copy_(ws.swap_buffer.narrow(-2, 0, nb).narrow(-1, 0, ncols));
 }
 
+// cuBLAS Batched TRSM only works with square inputs,
+// hence the need for this kernel for rectangular inputs
 template <typename scalar_t, int BS>
 __global__ void __launch_bounds__(BS)
 batched_panel_full_kernel(
