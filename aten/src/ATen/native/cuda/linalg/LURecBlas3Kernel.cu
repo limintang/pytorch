@@ -379,6 +379,7 @@ void batched_apply_pivots_parallel(
   // Gather nb rows into swap_buf + patch dA, tiled across columns via grid.x
   // Max columns per tile limited by shared memory: nb * swp_width * sizeof(scalar_t) <= 48KB
   int swp_width = (48 * 1024) / (nb * sizeof(scalar_t));
+  auto swp_width = std::min(swp_width, ncol);
   int col_tiles = (ncols + swp_width - 1) / swp_width;
   size_t shmem = nb * swp_width * sizeof(scalar_t);
   auto grid = dim3(col_tiles, 1, batch_count);
