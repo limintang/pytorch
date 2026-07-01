@@ -34,6 +34,8 @@ namespace at::native {
 
 namespace {
 
+#define IdxLin(i, j, lda) i + static_cast<size_t>(j) * lda
+
 struct LUNbConfig {
   int nb_small; // outer loop blocking factor when n < nb_crossover_n
   int nb_large; // outer loop blocking factor when n >= nb_crossover_n
@@ -457,21 +459,23 @@ batched_panel_full_kernel(
 
     if (std::abs(sdiag) != 0) {
       for (int i = k + 1 + tid; i < m; i += BS) {
-        A[i + static_cast<size_t>(k) * lda] /= sdiag;
+        A[IdxLin(i, k, lda)] /= sdiag;
       }
     }
     __syncthreads();
 
     // 4. Rank-1 update (linearized)
     if (rows_below > 0 && update_cols > 0) {
-      int numel = rows_below * update_cols;
+      // rows_below can be padded to be divisible by 32,
+      // but the boundary condition check inflicts more damage
+      // than warp threads attempting to read from/write to different columns
+      auto numel = rows_below * update_cols;
       for (int idx = tid; idx < numel; idx += BS) {
-        auto ri = idx % rows_below;
-        auto ci = idx / rows_below;
-        auto i = k + 1 + ri;
-        auto j = k + 1 + ci;
-        A[i + static_cast<size_t>(j) * lda] -=
-          A[i + static_cast<size_t>(k) * lda] * A[k + static_cast<size_t>(j) * lda];
+        auto local_row = idx % rows_below;
+        auto local_col = idx / rows_below;
+        auto i = k + 1 + local_row;
+        auto j = k + 1 + local_col;
+        A[IdxLin(i, j, lda)] -= A[IdxLin(i, k, lda)] * A[IdxLin(k, j, lda)];
       }
     }
   } // for cols in the panel
