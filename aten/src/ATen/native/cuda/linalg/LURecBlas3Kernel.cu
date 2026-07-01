@@ -52,7 +52,7 @@ struct LUTuning {
 // Pre-tuned constants per compute capability
 static constexpr LUTuning tuning_sm80  = {128,  8, 2048, {64, 256}, {64, 256}};  // A100 (swept 2026-06-10)
 static constexpr LUTuning tuning_sm89  = {512, 14, 1024, {48, 256}, {48, 256}};  // L40S (swept 2026-06-10)
-static constexpr LUTuning tuning_sm90  = {256, 14, 1024, {52, 256}, {28, 256}};  // H100 (swept 2026-06-09)
+static constexpr LUTuning tuning_sm90  = {512, 10,  512, {40, 256}, {64, 256}};  // H100 (swept 2026-07-01)
 static constexpr LUTuning tuning_sm100 = {256,  8, 1536, {16, 256}, {32, 256}};  // GB200 (swept 2026-06-11)
 
 inline LUTuning get_tuning() {
@@ -379,7 +379,7 @@ void batched_apply_pivots_parallel(
   // Gather nb rows into swap_buf + patch dA, tiled across columns via grid.x
   // Max columns per tile limited by shared memory: nb * swp_width * sizeof(scalar_t) <= 48KB
   int swp_width = (48 * 1024) / (nb * sizeof(scalar_t));
-  auto swp_width = std::min(swp_width, ncol);
+  swp_width = std::min(swp_width, ncols);
   int col_tiles = (ncols + swp_width - 1) / swp_width;
   size_t shmem = nb * swp_width * sizeof(scalar_t);
   auto grid = dim3(col_tiles, 1, batch_count);
