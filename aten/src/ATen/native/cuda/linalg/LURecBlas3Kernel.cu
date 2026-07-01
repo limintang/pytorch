@@ -34,7 +34,7 @@ namespace at::native {
 
 namespace {
 
-#define IdxLin(i, j, lda) i + static_cast<size_t>(j) * lda
+#define LinOff(i, j, lda) i + static_cast<size_t>(j) * lda
 
 struct LUNbConfig {
   int nb_small; // outer loop blocking factor when n < nb_crossover_n
@@ -314,15 +314,15 @@ laswp_rowparallel_kernel(
   int tile_width = ::min(swp_width, ncols - tile_col_start);
 
   if (tid < nb) {
+    // src/dst rows
     int src = piv[tid] - 1;
     int dst = piv[src - row_offset] - 1;
 
     // Pass 1: gather source into shared memory, patch dA
     for (int i = 0; i < tile_width; ++i) {
       int col = col_offset + tile_col_start + i;
-      sdata[tid + i * nb] = A[src + static_cast<size_t>(col) * lda];
-      A[src + static_cast<size_t>(col) * lda] =
-          A[dst + static_cast<size_t>(col) * lda];
+      sdata[tid + i * nb] = A[LinOff(src, col, lda)];
+      A[LinOff(src, col, lda)] = A[LinOff(dst, col, lda)];
     }
   }
   __syncthreads();
@@ -330,7 +330,7 @@ laswp_rowparallel_kernel(
   if (tid < nb) {
     // Pass 2: write shared memory to output buffer
     for (int i = 0; i < tile_width; ++i) {
-      out[tid + static_cast<size_t>(tile_col_start + i) * out_ld] = sdata[tid + i * nb];
+      out[LinOff(tid, tile_col_start + i, out_ld)] = sdata[tid + i * nb];
     }
   }
 }
@@ -428,7 +428,7 @@ batched_panel_full_kernel(
     auto my_max = static_cast<real_t>(-1);
     auto my_idx = -1;
     for (int i = k + tid; i < m; i += BS) {
-      auto v = std::abs(A[i + static_cast<size_t>(k) * lda]);
+      auto v = std::abs(A[LinOff(i, k, lda)]);
       if (v > my_max) {
         my_max = v;
         my_idx = i;
@@ -442,15 +442,15 @@ batched_panel_full_kernel(
     // 2. Row swaps
     if (pivot_row != k) {
       for (int j = tid + col_start; j < nb + col_start; j += BS) {
-        auto src = k + static_cast<size_t>(j) * lda;
-        auto dst = pivot_row + static_cast<size_t>(j) * lda;
+        auto src = LinOff(k, j, lda);
+        auto dst = LinOff(pivot_row, j, lda);
         thrust::swap(A[src], A[dst]);
       }
     }
 
     // 3. Scale (divide by diagonal - skip if zero for singular matrices)
     if (tid == 0) {
-      sdiag = A[k + static_cast<size_t>(k) * lda];
+      sdiag = A[LinOff(k, k, lda)];
       if (std::abs(sdiag) == 0 && dinfo[batch] == 0) {
         dinfo[batch] = k + 1; // 1-based!
       }
@@ -459,7 +459,7 @@ batched_panel_full_kernel(
 
     if (std::abs(sdiag) != 0) {
       for (int i = k + 1 + tid; i < m; i += BS) {
-        A[IdxLin(i, k, lda)] /= sdiag;
+        A[LinOff(i, k, lda)] /= sdiag;
       }
     }
     __syncthreads();
@@ -475,7 +475,7 @@ batched_panel_full_kernel(
         auto local_col = idx / rows_below;
         auto i = k + 1 + local_row;
         auto j = k + 1 + local_col;
-        A[IdxLin(i, j, lda)] -= A[IdxLin(i, k, lda)] * A[IdxLin(k, j, lda)];
+        A[LinOff(i, j, lda)] -= A[LinOff(i, k, lda)] * A[LinOff(k, j, lda)];
       }
     }
   } // for cols in the panel
