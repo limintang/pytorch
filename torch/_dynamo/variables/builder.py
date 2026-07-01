@@ -73,6 +73,7 @@ from torch._subclasses.fake_tensor import (
     FakeTensor,
     FakeTensorMode,
     is_fake,
+    is_fake_leaf,
     maybe_get_fake_mode,
 )
 from torch._subclasses.meta_utils import is_sparse_any, safe_grad
@@ -3606,7 +3607,7 @@ def _clone_input(value: Any, fake_mode: FakeTensorMode | None) -> Any:
     if isinstance(value, torch.Tensor):
         # tensor subclasses will not be converted to FakeTensors and need to be cloned
         if not (
-            isinstance(value, FakeTensor)
+            is_fake_leaf(value)
             or (
                 # Is functional tensor fakeified by this instance of Dynamo
                 torch._is_functional_tensor(value)

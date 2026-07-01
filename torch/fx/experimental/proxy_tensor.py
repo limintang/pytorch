@@ -57,6 +57,7 @@ from torch._subclasses.fake_tensor import (
     FakeTensorMode,
     get_plain_tensors,
     is_fake,
+    is_fake_leaf,
     unset_fake_temporarily,
 )
 from torch._subclasses.functional_tensor import FunctionalTensor
@@ -1717,7 +1718,7 @@ class PythonKeyTracer(Tracer):
             val = v.meta["val"]
             # other subclasses like FunctionalTensor error on `extract_val`
             # "Attempting to use FunctionalTensor on its own." just store FakeTensors for now
-            if isinstance(val, torch.Tensor) and not isinstance(val, FakeTensor):
+            if isinstance(val, torch.Tensor) and not is_fake_leaf(val):
                 return None
             return extract_val(v.meta["val"])
 

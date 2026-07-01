@@ -243,10 +243,17 @@ def get_plain_tensors(
     return out
 
 
+def is_fake_leaf(x: object) -> TypeGuard[Tensor]:
+    # True if x is itself a fake tensor: a Python FakeTensor, or a C++ fake
+    if isinstance(x, FakeTensor):
+        return True
+    return isinstance(x, Tensor) and torch._C._is_fake_tensor(x)
+
+
 def is_fake(x: object) -> TypeGuard[Tensor]:
     from torch._subclasses.functional_tensor import FunctionalTensor
 
-    if isinstance(x, FakeTensor):
+    if is_fake_leaf(x):
         return True
     if is_traceable_wrapper_subclass(x):
         attrs, _ = type(x).__tensor_flatten__(x)

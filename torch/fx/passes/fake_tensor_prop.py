@@ -1,7 +1,7 @@
 from typing import Any
 
 import torch.fx
-from torch._subclasses.fake_tensor import FakeTensor, FakeTensorMode
+from torch._subclasses.fake_tensor import FakeTensor, FakeTensorMode, is_fake_leaf
 from torch.fx import Node
 from torch.fx._compatibility import compatibility
 from torch.fx.experimental.proxy_tensor import py_sym_types, snapshot_fake
@@ -80,7 +80,7 @@ class FakeTensorProp(torch.fx.Interpreter):
         rebind_unbacked(self._mode.shape_env, n, result)
 
         def extract_val(obj: Any) -> Any:
-            if isinstance(obj, FakeTensor):
+            if is_fake_leaf(obj):
                 return snapshot_fake(obj)
             elif isinstance(obj, torch.Tensor):
                 # TODO: How is it possible that we get a non fake tensor?  We
